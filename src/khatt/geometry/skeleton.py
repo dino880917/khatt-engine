@@ -165,8 +165,8 @@ def _boost_dots(canvas, boost_factor):
 if __name__ == "__main__":
     render_skeleton(
         text        = "بسم الله",
-        font_path   = "assets\\fonts\\Amiri-Regular.ttf",
-        output_path = "outputs\\skeleton_test.png",
+        font_path   = "assets/fonts/Amiri-Regular.ttf",
+        output_path = "outputs/skeleton_test.png",
         font_size   = 140,
         dot_boost   = 1.15,
     )

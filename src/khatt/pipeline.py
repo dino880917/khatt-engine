@@ -4,10 +4,9 @@ from PIL import Image
 from khatt.geometry.skeleton  import render_skeleton
 from khatt.diffusion.stylizer import stylize_skeleton
 from khatt.validation.gate    import validate_output
-
 STYLES = {
     "thuluth": {
-        "font":      "assets\\fonts\\Amiri-Regular.ttf",
+        "font":      "assets/fonts/Amiri-Regular.ttf",
         "font_size": 140,
         "dot_color": (15, 8, 3),
         "prompt": (
@@ -17,7 +16,7 @@ STYLES = {
         ),
     },
     "naskh": {
-        "font":      "assets\\fonts\\Amiri-Regular.ttf",
+        "font":      "assets/fonts/Amiri-Regular.ttf",
         "font_size": 140,
         "dot_color": (15, 8, 3),
         "prompt": (
@@ -26,41 +25,41 @@ STYLES = {
         ),
     },
     "nastaliq": {
-    "font":      "assets\\fonts\\NotoNastaliqUrdu-Regular.ttf",
-    "font_size": 120,
-    "dot_color": (15, 8, 3),
-    "prompt": (
-        "Persian Nastaliq calligraphy, authentic diagonal script, "
-        "letters flowing upward to the right, deep black ink on "
-        "aged cream paper, Safavid dynasty manuscript style, "
-        "reed pen with natural ink bleed, each letter clearly "
-        "formed, classical Persian poetry manuscript, masterpiece"
-    ),
-},
-"ruqah": {
-    "font":      "assets\\fonts\\ArefRuqaa-Regular.ttf",
-    "font_size": 140,
-    "dot_color": (15, 8, 3),
-    "prompt": (
-        "Arabic Ruqah handwriting script, compressed simplified "
-        "letterforms, deep black ink on white paper, Ottoman "
-        "administrative document style, clean confident strokes, "
-        "professional calligrapher, high contrast, sharp edges, "
-        "each letter distinct and legible"
-    ),
-},
+        "font":      "assets/fonts/NotoNastaliqUrdu-Regular.ttf",
+        "font_size": 120,
+        "dot_color": (15, 8, 3),
+        "prompt": (
+            "Persian Nastaliq calligraphy, authentic diagonal script, "
+            "letters flowing upward to the right, deep black ink on "
+            "aged cream paper, Safavid dynasty manuscript style, "
+            "reed pen with natural ink bleed, each letter clearly "
+            "formed, classical Persian poetry manuscript, masterpiece"
+        ),
+    },
+    "ruqah": {
+        "font":      "assets/fonts/ArefRuqaa-Regular.ttf",
+        "font_size": 140,
+        "dot_color": (15, 8, 3),
+        "prompt": (
+            "Arabic Ruqah handwriting script, compressed simplified "
+            "letterforms, deep black ink on white paper, Ottoman "
+            "administrative document style, clean confident strokes, "
+            "professional calligrapher, high contrast, sharp edges, "
+            "each letter distinct and legible"
+        ),
+    },
     "kufic": {
-        "font":      "assets\\fonts\\ReemKufi-Regular.ttf",
+        "font":      "assets/fonts/ReemKufi-Regular.ttf",
         "font_size": 140,
         "dot_color": (212, 175, 55),
         "prompt": (
             "Arabic Kufic calligraphy, angular geometric letterforms, "
             "gold ink on dark stone, early Islamic architecture inscription, "
-            "bold geometric strokes, no curves, monumental style"
+            "bold geometric strokes, include all letter dots, monumental style"
         ),
     },
     "diwani": {
-        "font":      "assets\\fonts\\Amiri-Regular.ttf",
+        "font":      "assets/fonts/Amiri-Regular.ttf",
         "font_size": 140,
         "dot_color": (212, 175, 55),
         "prompt": (
@@ -98,6 +97,7 @@ def run(text, style="thuluth"):
     cfg           = STYLES[style]
     skeleton_path = "outputs\\skeleton.png"
     stylized_path = "outputs\\stylized.png"
+    font_path = "assets/fonts/Amiri-Regular.ttf"
 
     print("=" * 55)
     print(f"  Khatt Engine")
