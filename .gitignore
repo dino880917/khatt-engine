@@ -44,3 +44,6 @@ outputs/history/
 
 # Runtime outputs — not source code
 outputs/
+
+dataset/met_objects.csv
+dataset/*.csv
