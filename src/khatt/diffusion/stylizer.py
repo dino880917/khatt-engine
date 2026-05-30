@@ -84,6 +84,7 @@ def stylize_skeleton(skeleton_path, output_path, style_prompt,
 
     response = requests.post(
         "https://api.stability.ai/v2beta/stable-image/control/sketch",
+         timeout=120,
         headers={
             "authorization": f"Bearer {api_key}",
             "accept": "image/*",
