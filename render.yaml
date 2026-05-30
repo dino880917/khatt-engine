@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: khatt-engine
+    runtime: python
+    buildCommand: pip install -e .
+    startCommand: uvicorn khatt.api.server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: STABILITY_API_KEY
+        sync: false
+    autoDeploy: true

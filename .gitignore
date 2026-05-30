@@ -41,3 +41,6 @@ uv.lock
 .python-version
 
 outputs/history/
+
+# Runtime outputs — not source code
+outputs/
