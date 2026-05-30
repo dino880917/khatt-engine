@@ -48,6 +48,8 @@ textarea:focus{border-color:#c9a84c}
 .img-panel img{width:100%;display:block}
 .dl-btn{display:block;width:100%;margin-top:16px;padding:14px;background:transparent;color:#c9a84c;border:1px solid #4a3a10;border-radius:8px;font-size:11px;letter-spacing:4px;cursor:pointer;text-align:center;text-decoration:none;transition:all .2s;direction:ltr;text-transform:uppercase}
 .dl-btn:hover{background:#1e1608;border-color:#c9a84c}
+.regen-btn{display:block;width:100%;margin-top:10px;padding:13px;background:transparent;color:#5a4a2a;border:1px dashed #3a2a10;border-radius:8px;font-size:11px;letter-spacing:3px;cursor:pointer;text-align:center;text-decoration:none;transition:all .2s;direction:ltr;text-transform:uppercase}
+.regen-btn:hover{border-color:#7a6a4a;color:#7a6a4a}
 .error{display:none;background:#2a0e0e;border:1px solid #5a1a1a;border-radius:8px;padding:14px 18px;color:#c05a5a;font-size:13px;margin-top:14px;direction:ltr}
 .history-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
 .history-grid img{width:100%;border-radius:6px;cursor:pointer;border:1px solid #2e2410;transition:border-color .2s;display:block}
@@ -85,7 +87,7 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
     <button class="style-btn" data-style="diwani" onclick="pick(this)">
       <span class="style-ar">ديواني</span>
       <span class="style-en">Diwani</span>
-      <span class="style-note">gold ink · Ottoman</span>
+      <span class="style-note">silk · copper ink</span>
     </button>
   </div>
 
@@ -94,17 +96,17 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
     <button class="style-btn" data-style="nastaliq" onclick="pick(this)">
       <span class="style-ar">نستعليق</span>
       <span class="style-en">Nastaliq</span>
-      <span class="style-note">diagonal · Persian</span>
+      <span class="style-note">Persian · diagonal</span>
     </button>
     <button class="style-btn" data-style="ruqah" onclick="pick(this)">
       <span class="style-ar">رقعة</span>
       <span class="style-en">Ruqah</span>
-      <span class="style-note">compressed · everyday</span>
+      <span class="style-note">sepia · handmade paper</span>
     </button>
     <button class="style-btn" data-style="kufic" onclick="pick(this)">
       <span class="style-ar">كوفي</span>
       <span class="style-en">Kufic</span>
-      <span class="style-note">geometric · angular</span>
+      <span class="style-note">gold · black stone</span>
     </button>
   </div>
 
@@ -145,6 +147,7 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
       <img id="style-img" src="" alt="stylized">
     </div>
   </div>
+
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
     <a class="dl-btn" id="dl" href="#" download="khatt_output.png"
        style="margin-top:0">
@@ -156,6 +159,9 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
       Download Transparent
     </a>
   </div>
+  <button class="regen-btn" onclick="regenerate()">
+    ↻ &nbsp; Regenerate — different aesthetic, same text
+  </button>
 </div>
 
 <div class="card" id="history-card" style="display:none">
@@ -167,7 +173,10 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
 </div>
 
 <script>
-let style = 'thuluth';
+let style        = 'thuluth';
+let lastText     = '';
+let lastFontSize = 140;
+
 const msgs = [
   'جارٍ تشكيل الحروف بـ HarfBuzz...',
   'تطبيق نظام ابن المقلة...',
@@ -183,11 +192,20 @@ function pick(btn) {
   style = btn.dataset.style;
 }
 
+function regenerate() {
+  const txt = document.getElementById('txt').value.trim();
+  if (!txt) return;
+  generate();
+}
+
 async function generate() {
   const text     = document.getElementById('txt').value.trim();
   const fontSize = parseInt(document.getElementById('font-size').value);
 
   if (!text) { showErr('الرجاء إدخال نص عربي'); return; }
+
+  lastText     = text;
+  lastFontSize = fontSize;
 
   const btn = document.querySelector('.gen-btn');
   btn.disabled = true;
@@ -215,9 +233,10 @@ async function generate() {
     document.getElementById('skel-img').src  = data.skeleton_url + '&_=' + ts;
     document.getElementById('style-img').src = data.image_url    + '&_=' + ts;
     document.getElementById('dl').href       = data.image_url;
+
     const dlTransparent = document.getElementById('dl-transparent');
     if (data.transparent_url) {
-      dlTransparent.href    = data.transparent_url;
+      dlTransparent.href          = data.transparent_url;
       dlTransparent.style.display = 'block';
     } else {
       dlTransparent.style.display = 'none';
@@ -230,18 +249,17 @@ async function generate() {
 
     document.getElementById('result').style.display = 'block';
 
-    // Update history panel
     if (data.history && data.history.length > 0) {
       const grid = document.getElementById('history-grid');
       const card = document.getElementById('history-card');
       grid.innerHTML = '';
       data.history.forEach(url => {
-        const img    = document.createElement('img');
-        img.src      = url + '?_=' + ts;
-        img.title    = 'Click to view';
-        img.onclick  = () => {
-          document.getElementById('style-img').src = img.src;
-          document.getElementById('dl').href        = url;
+        const img   = document.createElement('img');
+        img.src     = url + '?_=' + ts;
+        img.title   = 'Click to view';
+        img.onclick = () => {
+          document.getElementById('style-img').src        = img.src;
+          document.getElementById('dl').href              = url;
           document.getElementById('result').style.display = 'block';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
@@ -260,7 +278,7 @@ async function generate() {
 }
 
 function showErr(msg) {
-  const el = document.getElementById('err');
+  const el          = document.getElementById('err');
   el.textContent    = msg;
   el.style.display  = 'block';
 }

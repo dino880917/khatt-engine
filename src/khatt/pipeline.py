@@ -11,20 +11,24 @@ STYLES = {
         "dot_color": (15, 8, 3),
         "border":    True,
         "prompt": (
-            "Arabic Thuluth calligraphy, single word composition, "
-            "deep black ink on aged parchment, classical Islamic art, "
-            "reed pen strokes, isolated word, no other text, museum quality"
+            "Arabic Thuluth calligraphy on aged yellowed parchment, "
+            "single word, deep matte black ink with visible reed pen "
+            "texture, classical Mamluk manuscript style, warm ivory "
+            "background with natural aging spots, museum conservation "
+            "quality, dramatic thick-thin contrast in strokes"
         ),
     },
     "naskh": {
         "font":      "assets/fonts/Amiri-Regular.ttf",
         "font_size": 140,
-        "dot_color": (15, 8, 3),
+        "dot_color": (10, 10, 10),
         "border":    False,
         "prompt": (
-            "Arabic Naskh calligraphy, single isolated word, "
-            "black ink on white paper, clean precise letterforms, "
-            "no background text, no secondary lines, sharp and legible"
+            "Arabic Naskh calligraphy, single isolated word, crisp "
+            "cold black ink on bright white smooth paper, modern "
+            "clean editorial style, sharp precise edges, high contrast "
+            "monochrome, contemporary Arabic typography, no background "
+            "texture, clinical white background"
         ),
     },
     "nastaliq": {
@@ -33,9 +37,11 @@ STYLES = {
         "dot_color": (15, 8, 3),
         "border":    False,
         "prompt": (
-            "Persian Nastaliq calligraphy, single word, diagonal flowing "
-            "script, deep black ink on aged cream paper, Safavid style, "
-            "no additional text, no background writing, masterpiece"
+            "Persian Nastaliq calligraphy single word, diagonal flowing "
+            "script climbing upward, deep indigo-black ink on faded "
+            "blue-grey Persian manuscript paper, Safavid court style, "
+            "delicate hair-thin upstrokes contrasting heavy downstrokes, "
+            "subtle gold dust flecks in background, poetic manuscript"
         ),
     },
     "ruqah": {
@@ -44,9 +50,10 @@ STYLES = {
         "dot_color": (15, 8, 3),
         "border":    False,
         "prompt": (
-            "Arabic Ruqah calligraphy, single isolated word, "
-            "compressed letterforms, black ink on cream paper, "
-            "no other text, no background writing, clean strokes"
+            "Arabic Ruqah script single word, fast confident strokes, "
+            "sepia brown ink on rough cream handmade paper, Ottoman "
+            "administrative letter style, informal spontaneous energy, "
+            "visible paper grain texture, warm brown tones throughout"
         ),
     },
     "kufic": {
@@ -55,20 +62,24 @@ STYLES = {
         "dot_color": (212, 175, 55),
         "border":    True,
         "prompt": (
-            "Arabic Kufic calligraphy, angular geometric letterforms, "
-            "gold ink on dark stone, single word inscription, "
-            "architectural style, bold geometric strokes, monumental"
+            "Arabic Kufic inscription, single word, burnished gold leaf "
+            "letterforms on deep charcoal black polished stone, early "
+            "Islamic architectural monument style, perfectly geometric "
+            "angular strokes, no curves, bold flat gold with subtle "
+            "metallic sheen, stone surface texture visible"
         ),
     },
     "diwani": {
         "font":      "assets/fonts/Amiri-Regular.ttf",
         "font_size": 140,
-        "dot_color": (212, 175, 55),
+        "dot_color": (139, 90, 43),
         "border":    True,
         "prompt": (
-            "Arabic Diwani calligraphy, single word composition, "
-            "gold ink on cream parchment, Ottoman imperial style, "
-            "elaborate letterforms, no secondary text, luxury"
+            "Arabic Diwani calligraphy single word, rich copper-brown "
+            "ink on deep burgundy red silk, Ottoman imperial tughra "
+            "style, ornate elaborate letterforms, warm candlelight "
+            "illumination, luxury manuscript on textile, deep jewel "
+            "tones, rich warm shadows"
         ),
     },
 }
