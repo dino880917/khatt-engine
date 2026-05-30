@@ -93,6 +93,12 @@ def stylize_skeleton(skeleton_path, output_path, style_prompt,
         data={
             "prompt": style_prompt,
             "negative_prompt": (
+                "extra calligraphic text, background Arabic writing, "
+                "secondary text lines, additional words, border calligraphy, "
+                "filler calligraphy, ornamental text fills, margin writing, "
+                "extra flourishes outside the main letters, duplicate strokes, "
+                "decorative text backgrounds, stamps, seals, medallions, "
+                "calligraphic borders with text, additional ornamental elements, "
                 "blurry, distorted, illegible, deformed letters, "
                 "missing dots, wrong letterforms, latin text, unreadable"
             ),
