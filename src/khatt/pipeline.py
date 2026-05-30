@@ -9,63 +9,66 @@ STYLES = {
         "font":      "assets/fonts/Amiri-Regular.ttf",
         "font_size": 140,
         "dot_color": (15, 8, 3),
+        "border":    True,
         "prompt": (
-            "Arabic Thuluth calligraphy, each letter clearly legible, "
-            "deep black ink on aged parchment, classical Islamic manuscript, "
-            "reed pen strokes, museum quality, high contrast"
+            "Arabic Thuluth calligraphy, single word composition, "
+            "deep black ink on aged parchment, classical Islamic art, "
+            "reed pen strokes, isolated word, no other text, museum quality"
         ),
     },
     "naskh": {
         "font":      "assets/fonts/Amiri-Regular.ttf",
         "font_size": 140,
         "dot_color": (15, 8, 3),
+        "border":    False,
         "prompt": (
-            "Arabic Naskh calligraphy, clean precise letterforms, "
-            "black ink on white paper, classical manuscript, sharp and legible"
+            "Arabic Naskh calligraphy, single isolated word, "
+            "black ink on white paper, clean precise letterforms, "
+            "no background text, no secondary lines, sharp and legible"
         ),
     },
     "nastaliq": {
         "font":      "assets/fonts/NotoNastaliqUrdu-Regular.ttf",
         "font_size": 120,
         "dot_color": (15, 8, 3),
+        "border":    False,
         "prompt": (
-            "Persian Nastaliq calligraphy, authentic diagonal script, "
-            "letters flowing upward to the right, deep black ink on "
-            "aged cream paper, Safavid dynasty manuscript style, "
-            "reed pen with natural ink bleed, each letter clearly "
-            "formed, classical Persian poetry manuscript, masterpiece"
+            "Persian Nastaliq calligraphy, single word, diagonal flowing "
+            "script, deep black ink on aged cream paper, Safavid style, "
+            "no additional text, no background writing, masterpiece"
         ),
     },
     "ruqah": {
         "font":      "assets/fonts/ArefRuqaa-Regular.ttf",
         "font_size": 140,
         "dot_color": (15, 8, 3),
+        "border":    False,
         "prompt": (
-            "Arabic Ruqah handwriting script, compressed simplified "
-            "letterforms, deep black ink on white paper, Ottoman "
-            "administrative document style, clean confident strokes, "
-            "professional calligrapher, high contrast, sharp edges, "
-            "each letter distinct and legible"
+            "Arabic Ruqah calligraphy, single isolated word, "
+            "compressed letterforms, black ink on cream paper, "
+            "no other text, no background writing, clean strokes"
         ),
     },
     "kufic": {
         "font":      "assets/fonts/ReemKufi-Regular.ttf",
         "font_size": 140,
         "dot_color": (212, 175, 55),
+        "border":    True,
         "prompt": (
             "Arabic Kufic calligraphy, angular geometric letterforms, "
-            "gold ink on dark stone, early Islamic architecture inscription, "
-            "bold geometric strokes, include all letter dots, monumental style"
+            "gold ink on dark stone, single word inscription, "
+            "architectural style, bold geometric strokes, monumental"
         ),
     },
     "diwani": {
         "font":      "assets/fonts/Amiri-Regular.ttf",
         "font_size": 140,
         "dot_color": (212, 175, 55),
+        "border":    True,
         "prompt": (
-            "Arabic Diwani calligraphy, highly ornate flowing script, "
-            "gold ink on cream parchment, Ottoman imperial court style, "
-            "elaborate letterforms, luxury manuscript"
+            "Arabic Diwani calligraphy, single word composition, "
+            "gold ink on cream parchment, Ottoman imperial style, "
+            "elaborate letterforms, no secondary text, luxury"
         ),
     },
 }
@@ -107,7 +110,11 @@ def run(text, style="thuluth"):
     print("=" * 55)
 
     print("\n[Layer 1+2] Generating skeleton...")
-    render_skeleton(text, cfg["font"], skeleton_path, font_size=cfg["font_size"])
+    render_skeleton(
+        text, cfg["font"], skeleton_path,
+        font_size=cfg["font_size"],
+        add_border=cfg.get("border", False)
+    )
 
     print("\n[Check]    Enforcing aspect ratio...")
     enforce_aspect_ratio(skeleton_path)

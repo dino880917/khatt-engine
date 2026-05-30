@@ -7,14 +7,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from PIL import Image
 
 from khatt.geometry.skeleton  import render_skeleton
 from khatt.diffusion.stylizer import stylize_skeleton
 from khatt.validation.gate    import validate_output
 from khatt.pipeline           import STYLES, enforce_aspect_ratio
 
-# ── Create required directories on startup ──────────────────────────
+# Create required directories on startup
 Path("outputs").mkdir(exist_ok=True)
 Path("outputs/history").mkdir(exist_ok=True)
 
@@ -60,20 +59,17 @@ def generate(req: GenerateRequest):
         # Layer 1 + 2 — skeleton
         render_skeleton(
             text, cfg["font"], skeleton_path,
-            font_size=req.font_size
+            font_size=req.font_size,
+            add_border=cfg.get("border", False)
         )
 
         # Layer 3 — aspect ratio
         enforce_aspect_ratio(skeleton_path)
 
-        # Layer 5 — validation
-        # Layer 5 — validation
-        # Skip OCR on production to avoid timeout on free tier
-        # HarfBuzz guarantees linguistic correctness at Layer 1
+        # Layer 5 — validation (skipped on production)
         skip_ocr = os.getenv("SKIP_OCR", "false").lower() == "true"
         if skip_ocr:
             passed, score = True, 1.0
-            print("OCR skipped (SKIP_OCR=true)")
         else:
             passed, score, _ = validate_output(skeleton_path, text)
 
