@@ -1,0 +1,41 @@
+# Environment — never commit your API key
+.env
+
+# Virtual environment — too large, rebuilt from pyproject.toml
+.venv/
+
+# Generated outputs — user-specific, not source code
+outputs/*.png
+outputs/*.jpg
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+src/khatt/__pycache__/
+src/khatt/**/__pycache__/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary OCR file
+outputs/ocr_temp.png
+outputs/skeleton_raw.png
+outputs/*_raw.png
+
+# uv specific files
+uv.lock
+.python-version

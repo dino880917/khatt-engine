@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>محرك الخط | Khatt Engine</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111008;color:#e8d9b5;font-family:'Segoe UI',Tahoma,Arial,sans-serif;min-height:100vh;padding:40px 20px}
+.container{max-width:920px;margin:0 auto}
+header{text-align:center;margin-bottom:48px;padding-bottom:32px;border-bottom:1px solid #2e2410}
+.logo-ar{font-size:56px;color:#c9a84c;margin-bottom:6px}
+.logo-en{font-size:11px;color:#5a4a2a;letter-spacing:8px;text-transform:uppercase;direction:ltr}
+.tagline{margin-top:14px;font-size:13px;color:#7a6a4a}
+.card{background:#181208;border:1px solid #2e2410;border-radius:12px;padding:32px;margin-bottom:20px}
+label{display:block;font-size:11px;color:#c9a84c;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+textarea{width:100%;background:#111008;border:1px solid #3a2a10;border-radius:8px;color:#e8d9b5;font-size:30px;padding:16px 20px;direction:rtl;resize:vertical;min-height:84px;outline:none;transition:border-color .2s;font-family:inherit}
+textarea:focus{border-color:#c9a84c}
+.style-section-label{font-size:11px;color:#c9a84c;letter-spacing:2px;text-transform:uppercase;margin:24px 0 12px;display:block}
+.style-group-label{font-size:10px;color:#5a4a2a;letter-spacing:3px;text-transform:uppercase;margin:16px 0 8px;direction:ltr}
+.style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px}
+.style-btn{background:#111008;border:1px solid #3a2a10;border-radius:8px;padding:14px 8px;cursor:pointer;text-align:center;transition:all .2s;color:#7a6a4a;width:100%}
+.style-btn:hover{border-color:#c9a84c;color:#e8d9b5}
+.style-btn.active{border-color:#c9a84c;background:#1e1608;color:#c9a84c}
+.style-ar{font-size:20px;display:block;margin-bottom:3px}
+.style-en{font-size:9px;direction:ltr;letter-spacing:3px;text-transform:uppercase}
+.style-note{font-size:9px;color:#5a4a2a;margin-top:2px;display:block}
+.divider{border:none;border-top:1px solid #2e2410;margin:6px 0}
+.gen-btn{width:100%;margin-top:24px;padding:18px;background:#c9a84c;color:#111008;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:3px;transition:all .2s;text-transform:uppercase}
+.gen-btn:hover:not(:disabled){background:#dbb85e}
+.gen-btn:disabled{opacity:.4;cursor:not-allowed}
+.loading{display:none;text-align:center;padding:40px;color:#7a6a4a}
+.spinner{width:44px;height:44px;border:3px solid #2e2410;border-top-color:#c9a84c;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:13px;letter-spacing:2px}
+.result{display:none}
+.result-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;direction:ltr}
+.result-label{font-size:11px;letter-spacing:3px;color:#5a4a2a;text-transform:uppercase}
+.badge{font-size:11px;padding:4px 14px;border-radius:20px;letter-spacing:1px}
+.badge-pass{background:#0e2a0e;color:#5aaa5a;border:1px solid #1a4a1a}
+.badge-warn{background:#2a1e08;color:#c9a84c;border:1px solid #4a3a10}
+.img-row{display:grid;grid-template-columns:1fr 2fr;gap:14px;align-items:start}
+.img-panel{background:#111008;border:1px solid #2e2410;border-radius:8px;overflow:hidden}
+.img-label{padding:8px 14px;font-size:10px;color:#5a4a2a;letter-spacing:3px;text-transform:uppercase;border-bottom:1px solid #2e2410;direction:ltr}
+.img-panel img{width:100%;display:block}
+.dl-btn{display:block;width:100%;margin-top:16px;padding:14px;background:transparent;color:#c9a84c;border:1px solid #4a3a10;border-radius:8px;font-size:11px;letter-spacing:4px;cursor:pointer;text-align:center;text-decoration:none;transition:all .2s;direction:ltr;text-transform:uppercase}
+.dl-btn:hover{background:#1e1608;border-color:#c9a84c}
+.error{display:none;background:#2a0e0e;border:1px solid #5a1a1a;border-radius:8px;padding:14px 18px;color:#c05a5a;font-size:13px;margin-top:14px;direction:ltr}
+footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spacing:4px;direction:ltr;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="logo-ar">محرك الخط</div>
+  <div class="logo-en">Khatt Engine</div>
+  <div class="tagline">توليد الخط العربي بدقة لغوية كاملة — الحرف من اللغة، لا من الذكاء الاصطناعي</div>
+</header>
+
+<div class="card">
+  <label>النص العربي</label>
+  <textarea id="txt" placeholder="اكتب النص هنا...">بسم الله</textarea>
+
+  <span class="style-section-label">أسلوب الخط</span>
+
+  <div class="style-group-label">— Naskh family (Amiri font)</div>
+  <div class="style-grid">
+    <button class="style-btn active" data-style="thuluth" onclick="pick(this)">
+      <span class="style-ar">ثلث</span>
+      <span class="style-en">Thuluth</span>
+      <span class="style-note">parchment · black ink</span>
+    </button>
+    <button class="style-btn" data-style="naskh" onclick="pick(this)">
+      <span class="style-ar">نسخ</span>
+      <span class="style-en">Naskh</span>
+      <span class="style-note">white paper · clean</span>
+    </button>
+    <button class="style-btn" data-style="diwani" onclick="pick(this)">
+      <span class="style-ar">ديواني</span>
+      <span class="style-en">Diwani</span>
+      <span class="style-note">gold ink · Ottoman</span>
+    </button>
+  </div>
+
+  <div class="style-group-label">— Structurally distinct fonts</div>
+  <div class="style-grid">
+    <button class="style-btn" data-style="nastaliq" onclick="pick(this)">
+      <span class="style-ar">نستعليق</span>
+      <span class="style-en">Nastaliq</span>
+      <span class="style-note">diagonal · Persian</span>
+    </button>
+    <button class="style-btn" data-style="ruqah" onclick="pick(this)">
+      <span class="style-ar">رقعة</span>
+      <span class="style-en">Ruqah</span>
+      <span class="style-note">compressed · everyday</span>
+    </button>
+    <button class="style-btn" data-style="kufic" onclick="pick(this)">
+      <span class="style-ar">كوفي</span>
+      <span class="style-en">Kufic</span>
+      <span class="style-note">geometric · angular</span>
+    </button>
+  </div>
+
+  <button class="gen-btn" onclick="generate()">توليد الخط &nbsp;·&nbsp; Generate</button>
+  <div class="error" id="err"></div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text" id="ltxt">جارٍ تشكيل الحروف...</div>
+</div>
+
+<div class="card result" id="result">
+  <div class="result-top">
+    <span class="result-label">Result</span>
+    <span class="badge" id="badge"></span>
+  </div>
+  <div class="img-row">
+    <div class="img-panel">
+      <div class="img-label">Skeleton</div>
+      <img id="skel-img" src="" alt="skeleton">
+    </div>
+    <div class="img-panel">
+      <div class="img-label">Stylized</div>
+      <img id="style-img" src="" alt="stylized">
+    </div>
+  </div>
+  <a class="dl-btn" id="dl" href="#" download="khatt_output.png">Download Image</a>
+</div>
+
+<footer>Khatt Engine &nbsp;·&nbsp; MVP &nbsp;·&nbsp; Linguistically Sovereign Arabic Calligraphy</footer>
+</div>
+
+<script>
+let style = 'thuluth';
+const msgs = [
+  'جارٍ تشكيل الحروف بـ HarfBuzz...',
+  'تطبيق نظام ابن المقلة...',
+  'إرسال الهيكل إلى الذكاء الاصطناعي...',
+  'تلوين الحبر والرق...',
+  'التحقق من صحة النص...',
+];
+let mi = 0, iv;
+
+function pick(btn) {
+  document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  style = btn.dataset.style;
+}
+
+async function generate() {
+  const text = document.getElementById('txt').value.trim();
+  if (!text) { showErr('الرجاء إدخال نص عربي'); return; }
+
+  const btn = document.querySelector('.gen-btn');
+  btn.disabled = true;
+  document.getElementById('err').style.display = 'none';
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+  mi = 0;
+  document.getElementById('ltxt').textContent = msgs[0];
+  iv = setInterval(() => {
+    mi = (mi + 1) % msgs.length;
+    document.getElementById('ltxt').textContent = msgs[mi];
+  }, 5000);
+
+  try {
+    const res  = await fetch('/api/generate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({text, style})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Server error');
+
+    const ts = Date.now();
+    document.getElementById('skel-img').src  = data.skeleton_url + '&_=' + ts;
+    document.getElementById('style-img').src = data.image_url    + '&_=' + ts;
+    document.getElementById('dl').href       = data.image_url;
+
+    const badge = document.getElementById('badge');
+    const pct   = Math.round(data.validation_score * 100);
+    badge.className   = 'badge ' + (data.validation_passed ? 'badge-pass' : 'badge-warn');
+    badge.textContent = (data.validation_passed ? 'Validated' : 'Partial') + ' · ' + pct + '%';
+
+    document.getElementById('result').style.display = 'block';
+  } catch(e) {
+    showErr(e.message);
+  } finally {
+    clearInterval(iv);
+    document.getElementById('loading').style.display = 'none';
+    btn.disabled = false;
+  }
+}
+
+function showErr(msg) {
+  const el = document.getElementById('err');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+document.getElementById('txt').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') generate();
+});
+</script>
+</body>
+</html>
