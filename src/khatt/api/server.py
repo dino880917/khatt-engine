@@ -1,12 +1,14 @@
 import os
 import shutil
 import time
+import numpy as np
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from PIL import Image
 
 from khatt.geometry.skeleton  import render_skeleton
 from khatt.diffusion.stylizer import stylize_skeleton
@@ -19,6 +21,51 @@ Path("outputs/history").mkdir(exist_ok=True)
 
 app = FastAPI(title="Khatt Engine")
 app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
+
+
+def create_transparent_png(stylized_path, skeleton_mask_path, output_path):
+    """
+    Creates a transparent PNG using a borderless skeleton as alpha mask.
+
+    Fixes applied:
+      1. Uses borderless skeleton — frame lines do not appear in output
+      2. binary_fill_holes — fills counter-forms (inside of ع م ب etc)
+         so letter interiors are opaque, not transparent holes
+      3. binary_dilation — expands mask slightly to cover anti-aliasing
+         fringe, eliminating white halos around letter edges
+      4. Gaussian smoothing — soft natural edges for professional output
+    """
+    from scipy import ndimage
+    from scipy.ndimage import gaussian_filter
+
+    stylized = Image.open(stylized_path).convert("RGBA")
+    skeleton = Image.open(skeleton_mask_path).convert("L")
+
+    if skeleton.size != stylized.size:
+        skeleton = skeleton.resize(stylized.size, Image.LANCZOS)
+
+    skel_arr = np.array(skeleton, dtype=np.uint8)
+
+    # Binary ink mask — strict threshold for clean edges
+    ink_mask = skel_arr < 100
+
+    # Fill enclosed counter-forms (interior spaces of letters)
+    filled = ndimage.binary_fill_holes(ink_mask)
+
+    # Dilate to cover anti-aliasing edges — removes white halos
+    struct  = ndimage.generate_binary_structure(2, 1)
+    dilated = ndimage.binary_dilation(
+        filled, structure=struct, iterations=3
+    )
+
+    # Smooth edges for natural professional look
+    alpha_f = gaussian_filter(dilated.astype(np.float32) * 255, sigma=1.5)
+    alpha   = np.clip(alpha_f, 0, 255).astype(np.uint8)
+
+    style_arr          = np.array(stylized)
+    style_arr[:, :, 3] = alpha
+    Image.fromarray(style_arr, 'RGBA').save(output_path, format='PNG')
+    print(f"Transparent PNG -> {output_path}")
 
 
 class GenerateRequest(BaseModel):
@@ -51,9 +98,10 @@ def generate(req: GenerateRequest):
     if not (60 <= req.font_size <= 300):
         raise HTTPException(400, "font_size must be between 60 and 300")
 
-    cfg           = STYLES[style]
-    skeleton_path = "outputs/skeleton.png"
-    stylized_path = "outputs/stylized.png"
+    cfg               = STYLES[style]
+    skeleton_path     = "outputs/skeleton.png"
+    stylized_path     = "outputs/stylized.png"
+    transparent_path  = "outputs/transparent.png"
 
     try:
         # Layer 1 + 2 — skeleton
@@ -66,7 +114,7 @@ def generate(req: GenerateRequest):
         # Layer 3 — aspect ratio
         enforce_aspect_ratio(skeleton_path)
 
-        # Layer 5 — validation (skipped on production)
+        # Layer 5 — validation
         skip_ocr = os.getenv("SKIP_OCR", "false").lower() == "true"
         if skip_ocr:
             passed, score = True, 1.0
@@ -83,29 +131,39 @@ def generate(req: GenerateRequest):
         if not success:
             raise HTTPException(500, "Stylization API call failed")
 
+        skeleton_mask_path = "outputs/skeleton_mask.png"
+
+        try:
+            create_transparent_png(
+                stylized_path, skeleton_mask_path, transparent_path
+            )
+            transparent_ok = True
+        except Exception as e:
+            print(f"Transparent PNG failed: {e}")
+            transparent_ok = False
+
         # Save to history
         ts        = int(time.time())
-        hist_path = Path("outputs/history") / f"{ts}_{style}.png"
+        hist_dir  = Path("outputs/history")
+        hist_path = hist_dir / f"{ts}_{style}.png"
         shutil.copy(stylized_path, hist_path)
 
         # Keep only last 12 history items
-        history_files = sorted(Path("outputs/history").glob("*.png"))
+        history_files = sorted(hist_dir.glob("*.png"))
         for old in history_files[:-12]:
             old.unlink()
 
-        # Build history list
         history = [
             f"/outputs/history/{f.name}"
-            for f in sorted(
-                Path("outputs/history").glob("*.png"),
-                reverse=True
-            )[:6]
+            for f in sorted(hist_dir.glob("*.png"), reverse=True)[:6]
         ]
 
         return {
             "success":           True,
             "image_url":         f"/outputs/stylized.png?t={ts}",
             "skeleton_url":      f"/outputs/skeleton.png?t={ts}",
+            "transparent_url":   f"/outputs/transparent.png?t={ts}"
+                                 if transparent_ok else None,
             "validation_score":  round(score, 2),
             "validation_passed": passed,
             "history":           history,

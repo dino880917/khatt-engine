@@ -212,19 +212,29 @@ def render_skeleton(text, font_path, output_path,
     if dot_boost > 1.0:
         canvas = _boost_dots(canvas, dot_boost)
 
-    # 7 — Geometric frame
+    # Save borderless canvas for alpha mask — must happen BEFORE adding frame
+    canvas_for_mask = canvas.copy()
+
+    # Fix 2 — add geometric frame (main output only)
     if add_border:
         canvas = add_frame(canvas)
 
-    # 8 — Scale to 1024px wide
-    img      = Image.fromarray(canvas, mode='L').convert('RGB')
+    # Scale to 1024px wide
     target_w = 1024
-    ratio    = target_w / img.width
-    target_h = int(img.height * ratio)
-    img      = img.resize((target_w, target_h), Image.LANCZOS)
+    ratio    = target_w / canvas.shape[1]
+    target_h = int(canvas.shape[0] * ratio)
 
+    img = Image.fromarray(canvas, mode='L').convert('RGB')
+    img = img.resize((target_w, target_h), Image.LANCZOS)
     img.save(output_path)
     print(f"Saved  -> {output_path}  ({img.width}x{img.height})")
+
+    # Save mask version — no border, same scale
+    mask_path = output_path.replace('.png', '_mask.png')
+    mask_img  = Image.fromarray(canvas_for_mask, mode='L').convert('RGB')
+    mask_img  = mask_img.resize((target_w, target_h), Image.LANCZOS)
+    mask_img.save(mask_path)
+    print(f"Mask   -> {mask_path}")
 
 
 def _boost_dots(canvas, boost_factor):

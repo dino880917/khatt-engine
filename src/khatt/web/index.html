@@ -145,7 +145,17 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
       <img id="style-img" src="" alt="stylized">
     </div>
   </div>
-  <a class="dl-btn" id="dl" href="#" download="khatt_output.png">Download Image</a>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+    <a class="dl-btn" id="dl" href="#" download="khatt_output.png"
+       style="margin-top:0">
+      Download PNG
+    </a>
+    <a class="dl-btn" id="dl-transparent" href="#"
+       download="khatt_transparent.png"
+       style="margin-top:0;display:none;border-color:#c9a84c;color:#c9a84c">
+      Download Transparent
+    </a>
+  </div>
 </div>
 
 <div class="card" id="history-card" style="display:none">
@@ -205,6 +215,13 @@ async function generate() {
     document.getElementById('skel-img').src  = data.skeleton_url + '&_=' + ts;
     document.getElementById('style-img').src = data.image_url    + '&_=' + ts;
     document.getElementById('dl').href       = data.image_url;
+    const dlTransparent = document.getElementById('dl-transparent');
+    if (data.transparent_url) {
+      dlTransparent.href    = data.transparent_url;
+      dlTransparent.style.display = 'block';
+    } else {
+      dlTransparent.style.display = 'none';
+    }
 
     const badge = document.getElementById('badge');
     const pct   = Math.round(data.validation_score * 100);
