@@ -39,3 +39,5 @@ outputs/*_raw.png
 # uv specific files
 uv.lock
 .python-version
+
+outputs/history/

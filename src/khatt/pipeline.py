@@ -26,25 +26,29 @@ STYLES = {
         ),
     },
     "nastaliq": {
-        "font":      "assets\\fonts\\NotoNastaliqUrdu-Regular.ttf",
-        "font_size": 120,
-        "dot_color": (15, 8, 3),
-        "prompt": (
-            "Persian Nastaliq calligraphy, diagonal flowing script, "
-            "letters climbing upward to the right, deep black ink, "
-            "classical Persian manuscript on aged paper, masterpiece"
-        ),
-    },
-    "ruqah": {
-        "font":      "assets\\fonts\\ArefRuqaa-Regular.ttf",
-        "font_size": 140,
-        "dot_color": (15, 8, 3),
-        "prompt": (
-            "Arabic Ruqah calligraphy, compressed simplified letterforms, "
-            "black ink on cream paper, everyday classical Arabic script, "
-            "clean strokes, minimal dots, Ottoman style"
-        ),
-    },
+    "font":      "assets\\fonts\\NotoNastaliqUrdu-Regular.ttf",
+    "font_size": 120,
+    "dot_color": (15, 8, 3),
+    "prompt": (
+        "Persian Nastaliq calligraphy, authentic diagonal script, "
+        "letters flowing upward to the right, deep black ink on "
+        "aged cream paper, Safavid dynasty manuscript style, "
+        "reed pen with natural ink bleed, each letter clearly "
+        "formed, classical Persian poetry manuscript, masterpiece"
+    ),
+},
+"ruqah": {
+    "font":      "assets\\fonts\\ArefRuqaa-Regular.ttf",
+    "font_size": 140,
+    "dot_color": (15, 8, 3),
+    "prompt": (
+        "Arabic Ruqah handwriting script, compressed simplified "
+        "letterforms, deep black ink on white paper, Ottoman "
+        "administrative document style, clean confident strokes, "
+        "professional calligrapher, high contrast, sharp edges, "
+        "each letter distinct and legible"
+    ),
+},
     "kufic": {
         "font":      "assets\\fonts\\ReemKufi-Regular.ttf",
         "font_size": 140,

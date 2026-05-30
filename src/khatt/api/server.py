@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
@@ -14,8 +15,9 @@ app = FastAPI(title="Khatt Engine")
 app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
 class GenerateRequest(BaseModel):
-    text:  str
-    style: str = "thuluth"
+    text:      str
+    style:     str = "thuluth"
+    font_size: int = 140
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
@@ -41,7 +43,7 @@ def generate(req: GenerateRequest):
 
     try:
         render_skeleton(text, cfg["font"], skeleton_path,
-                        font_size=cfg["font_size"])
+                        font_size=req.font_size)
         enforce_aspect_ratio(skeleton_path)
         passed, score, _ = validate_output(skeleton_path, text)
         success = stylize_skeleton(
@@ -53,13 +55,33 @@ def generate(req: GenerateRequest):
         if not success:
             raise HTTPException(500, "Stylization API call failed")
 
-        ts = os.path.getmtime(stylized_path)
+        import time
+        import shutil
+
+        # Save timestamped copy so history works
+        ts       = int(time.time())
+        hist_dir = Path("outputs/history")
+        hist_dir.mkdir(exist_ok=True)
+        hist_path = hist_dir / f"{ts}_{style}.png"
+        shutil.copy(stylized_path, hist_path)
+
+        # Keep only last 12 history items
+        history_files = sorted(hist_dir.glob("*.png"))
+        for old in history_files[:-12]:
+            old.unlink()
+
+        # Build history list for response
+        history = []
+        for f in sorted(hist_dir.glob("*.png"), reverse=True)[:6]:
+            history.append(f"/outputs/history/{f.name}")
+
         return {
             "success":           True,
             "image_url":         f"/outputs/stylized.png?t={ts}",
             "skeleton_url":      f"/outputs/skeleton.png?t={ts}",
             "validation_score":  round(score, 2),
             "validation_passed": passed,
+            "history":           history,
         }
     except HTTPException:
         raise

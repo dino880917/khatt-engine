@@ -25,7 +25,10 @@ textarea:focus{border-color:#c9a84c}
 .style-ar{font-size:20px;display:block;margin-bottom:3px}
 .style-en{font-size:9px;direction:ltr;letter-spacing:3px;text-transform:uppercase}
 .style-note{font-size:9px;color:#5a4a2a;margin-top:2px;display:block}
-.divider{border:none;border-top:1px solid #2e2410;margin:6px 0}
+.size-row{margin-top:24px}
+.size-row label{margin-bottom:8px}
+.size-row input[type=range]{width:100%;accent-color:#c9a84c;margin-top:4px;cursor:pointer}
+.size-hints{display:flex;justify-content:space-between;font-size:10px;color:#5a4a2a;direction:ltr;margin-top:4px}
 .gen-btn{width:100%;margin-top:24px;padding:18px;background:#c9a84c;color:#111008;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:3px;transition:all .2s;text-transform:uppercase}
 .gen-btn:hover:not(:disabled){background:#dbb85e}
 .gen-btn:disabled{opacity:.4;cursor:not-allowed}
@@ -46,6 +49,9 @@ textarea:focus{border-color:#c9a84c}
 .dl-btn{display:block;width:100%;margin-top:16px;padding:14px;background:transparent;color:#c9a84c;border:1px solid #4a3a10;border-radius:8px;font-size:11px;letter-spacing:4px;cursor:pointer;text-align:center;text-decoration:none;transition:all .2s;direction:ltr;text-transform:uppercase}
 .dl-btn:hover{background:#1e1608;border-color:#c9a84c}
 .error{display:none;background:#2a0e0e;border:1px solid #5a1a1a;border-radius:8px;padding:14px 18px;color:#c05a5a;font-size:13px;margin-top:14px;direction:ltr}
+.history-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.history-grid img{width:100%;border-radius:6px;cursor:pointer;border:1px solid #2e2410;transition:border-color .2s;display:block}
+.history-grid img:hover{border-color:#c9a84c}
 footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spacing:4px;direction:ltr;text-transform:uppercase}
 </style>
 </head>
@@ -102,6 +108,19 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
     </button>
   </div>
 
+  <div class="size-row">
+    <label>
+      حجم الخط — Font Size &nbsp;
+      <span id="size-val" style="color:#c9a84c">140</span>
+    </label>
+    <input type="range" id="font-size" min="80" max="260" value="140" step="20"
+      oninput="document.getElementById('size-val').textContent=this.value">
+    <div class="size-hints">
+      <span>80 · Small · Wide composition</span>
+      <span>260 · Large · Bold statement</span>
+    </div>
+  </div>
+
   <button class="gen-btn" onclick="generate()">توليد الخط &nbsp;·&nbsp; Generate</button>
   <div class="error" id="err"></div>
 </div>
@@ -129,7 +148,12 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
   <a class="dl-btn" id="dl" href="#" download="khatt_output.png">Download Image</a>
 </div>
 
-<footer>Khatt Engine &nbsp;·&nbsp; MVP &nbsp;·&nbsp; Linguistically Sovereign Arabic Calligraphy</footer>
+<div class="card" id="history-card" style="display:none">
+  <label>السجل — Recent Generations</label>
+  <div class="history-grid" id="history-grid"></div>
+</div>
+
+<footer>Khatt Engine &nbsp;·&nbsp; Linguistically Sovereign Arabic Calligraphy</footer>
 </div>
 
 <script>
@@ -150,14 +174,17 @@ function pick(btn) {
 }
 
 async function generate() {
-  const text = document.getElementById('txt').value.trim();
+  const text     = document.getElementById('txt').value.trim();
+  const fontSize = parseInt(document.getElementById('font-size').value);
+
   if (!text) { showErr('الرجاء إدخال نص عربي'); return; }
 
   const btn = document.querySelector('.gen-btn');
   btn.disabled = true;
-  document.getElementById('err').style.display = 'none';
+  document.getElementById('err').style.display    = 'none';
   document.getElementById('result').style.display = 'none';
   document.getElementById('loading').style.display = 'block';
+
   mi = 0;
   document.getElementById('ltxt').textContent = msgs[0];
   iv = setInterval(() => {
@@ -166,10 +193,10 @@ async function generate() {
   }, 5000);
 
   try {
-    const res  = await fetch('/api/generate', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({text, style})
+    const res = await fetch('/api/generate', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ text, style, font_size: fontSize }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Server error');
@@ -185,6 +212,27 @@ async function generate() {
     badge.textContent = (data.validation_passed ? 'Validated' : 'Partial') + ' · ' + pct + '%';
 
     document.getElementById('result').style.display = 'block';
+
+    // Update history panel
+    if (data.history && data.history.length > 0) {
+      const grid = document.getElementById('history-grid');
+      const card = document.getElementById('history-card');
+      grid.innerHTML = '';
+      data.history.forEach(url => {
+        const img    = document.createElement('img');
+        img.src      = url + '?_=' + ts;
+        img.title    = 'Click to view';
+        img.onclick  = () => {
+          document.getElementById('style-img').src = img.src;
+          document.getElementById('dl').href        = url;
+          document.getElementById('result').style.display = 'block';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+        grid.appendChild(img);
+      });
+      card.style.display = 'block';
+    }
+
   } catch(e) {
     showErr(e.message);
   } finally {
@@ -196,8 +244,8 @@ async function generate() {
 
 function showErr(msg) {
   const el = document.getElementById('err');
-  el.textContent = msg;
-  el.style.display = 'block';
+  el.textContent    = msg;
+  el.style.display  = 'block';
 }
 
 document.getElementById('txt').addEventListener('keydown', e => {
