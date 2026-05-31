@@ -372,28 +372,70 @@ async function nameToArabic() {
   if (!input) return;
 
   document.getElementById('name-suggestions').style.display = 'none';
+  const result  = document.getElementById('name-result');
+  const btn     = document.querySelector('[onclick="nameToArabic()"]');
+
+  btn.textContent  = 'Loading...';
+  btn.disabled     = true;
+  result.style.display = 'none';
 
   try {
     const res  = await fetch(`/api/name/lookup?q=${encodeURIComponent(input)}`);
     const data = await res.json();
-    const result = document.getElementById('name-result');
 
     if (data.found) {
+      const isTranslit = data.method === 'transliteration';
       document.getElementById('txt').value = data.arabic;
-      result.innerHTML = `✓ ${data.input} → <span style="font-size:20px">${data.arabic}</span> — ready to generate`;
-      result.style.display  = 'block';
-      result.style.background = '#0e2a0e';
-      result.style.border     = '1px solid #1a4a1a';
-      result.style.color      = '#5aaa5a';
+
+      result.style.display    = 'block';
+      result.style.background = isTranslit ? '#1e1a08' : '#0e2a0e';
+      result.style.border     = isTranslit
+                                ? '1px solid #4a4010'
+                                : '1px solid #1a4a1a';
+      result.style.color      = isTranslit ? '#c9a84c' : '#5aaa5a';
+
+      if (isTranslit) {
+        result.innerHTML = `
+          <div style="font-size:11px;letter-spacing:1px;margin-bottom:6px;opacity:0.7">
+            PHONETIC TRANSLITERATION
+          </div>
+          <div style="font-size:22px;margin-bottom:6px">${data.arabic}</div>
+          <div style="font-size:11px;opacity:0.8">
+            Loaded into text field — verify the spelling looks correct,
+            then click Generate
+          </div>`;
+      } else {
+        result.innerHTML = `
+          <div style="font-size:11px;letter-spacing:1px;margin-bottom:6px;opacity:0.7">
+            FROM NAME DATABASE
+          </div>
+          <div style="font-size:22px;margin-bottom:6px">${data.arabic}</div>
+          <div style="font-size:11px;opacity:0.8">
+            ✓ Canonical Arabic spelling confirmed
+          </div>`;
+      }
+
+      if (data.note) {
+        result.innerHTML += `<div style="margin-top:6px;font-size:11px;
+          opacity:0.7">⚠ ${data.note}</div>`;
+      }
+
     } else {
-      result.innerHTML = `"${data.input}" not found in our name database. Type the Arabic directly in the text field above.`;
-      result.style.display  = 'block';
+      result.style.display    = 'block';
       result.style.background = '#2a0e0e';
       result.style.border     = '1px solid #5a1a1a';
       result.style.color      = '#c05a5a';
+      result.innerHTML = data.error
+        ? `Service unavailable — type Arabic directly above.`
+        : `"${data.input}" could not be transliterated. Type the Arabic directly.`;
     }
+
   } catch(e) {
-    console.error(e);
+    result.style.display = 'block';
+    result.innerHTML     = 'Connection error — please try again.';
+  } finally {
+    btn.textContent = 'USE NAME →';
+    btn.disabled    = false;
   }
 }
 </script>

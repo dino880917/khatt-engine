@@ -437,3 +437,85 @@ def search(partial: str) -> list:
             })
 
     return sorted(results, key=lambda x: x["romanized"])[:8]
+
+def transliterate_western(name: str) -> dict:
+    """
+    Transliterates a Western name into Arabic phonetically using Claude.
+
+    Why Claude and not a rule-based algorithm:
+    - "Ch" in Christophe = K sound → ك
+    - "Ch" in Charlotte = SH sound → ش
+    - "Ch" in Chelsea = CH sound → تش
+    - French "Rose" and English "Rose" sound the same → روز
+    - French "Guillaume" → غيوم
+    - Rule-based systems cannot handle this cross-language complexity.
+    Claude understands phonetic patterns across all Western languages.
+
+    This function is only called when the name is NOT in the Arabic
+    lookup table — meaning it is clearly a non-Arabic name.
+    """
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    try:
+        import anthropic
+    except ImportError:
+        return {
+            "found":    False,
+            "arabic":   None,
+            "input":    name,
+            "method":   "transliteration",
+            "error":    "Anthropic SDK not installed"
+        }
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {
+            "found":    False,
+            "arabic":   None,
+            "input":    name,
+            "method":   "transliteration",
+            "error":    "ANTHROPIC_API_KEY not set"
+        }
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    prompt = (
+        f"Transliterate the name '{name}' into Arabic script phonetically. "
+        f"Rules:\n"
+        f"- Return ONLY the Arabic text, nothing else\n"
+        f"- No explanation, no punctuation, no vowel marks\n"
+        f"- Base the transliteration on how the name actually sounds\n"
+        f"- Consider the likely language origin of the name\n"
+        f"- Use standard Arabic letters only\n"
+        f"Examples: Rose → روز | Christophe → كريستوف | "
+        f"Marie → ماري | Guillaume → غيوم | "
+        f"Sophie → صوفي | Lucas → لوكاس | "
+        f"Charlotte → شارلوت | Jean → جان | "
+        f"Elena → إيلينا | Viktor → فيكتور"
+    )
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=50,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        arabic = message.content[0].text.strip()
+
+        return {
+            "found":    True,
+            "arabic":   arabic,
+            "input":    name,
+            "method":   "transliteration",
+            "note":     "Phonetic transliteration — verify before generating"
+        }
+
+    except Exception as e:
+        return {
+            "found":    False,
+            "arabic":   None,
+            "input":    name,
+            "method":   "transliteration",
+            "error":    str(e)
+        }
