@@ -126,14 +126,19 @@ def render_svg(text, font_path, output_path, font_size=140,
         if os.path.exists(mask):
             os.unlink(mask)
 
-def render_skeleton(text, font_path, output_path,
-                    font_size=140, dot_boost=1.15, add_border=True):
+def render_single_line(text, ft_face, hb_font, font_size, scale):
     """
-    Renders Arabic text as a clean skeleton PNG for AI stylization.
+    Render a single line of Arabic text to a numpy canvas.
+    Returns (canvas, width, height, baseline_y).
+    Internal helper for render_skeleton.
     """
-    blob    = hb.Blob.from_file_path(font_path)
-    hb_face = hb.Face(blob)
-    hb_font = hb.Font(hb_face)
+    harakat_clusters = {
+        i for i, ch in enumerate(text)
+        if ord(ch) in HARAKAT_RANGE
+    }
+    if harakat_clusters:
+        print(f"  Harakat at {len(harakat_clusters)} positions — gray")
+
     buf = hb.Buffer()
     buf.add_str(text)
     buf.guess_segment_properties()
@@ -141,18 +146,7 @@ def render_skeleton(text, font_path, output_path,
     infos     = buf.glyph_infos
     positions = buf.glyph_positions
 
-    harakat_clusters = {
-        i for i, ch in enumerate(text)
-        if ord(ch) in HARAKAT_RANGE
-    }
-    if harakat_clusters:
-        print(f"  Harakat at {len(harakat_clusters)} positions — "
-              f"rendering in gray ({HARAKAT_GRAY}/255)")
-
-    ft_face = freetype.Face(font_path)
-    ft_face.set_char_size(font_size * 64)
-    scale = font_size / ft_face.units_per_EM
-
+    # First pass — measure ink bounds
     glyphs_data = []
     cursor_x    = 0.0
     baseline_y  = 500
@@ -180,8 +174,7 @@ def render_skeleton(text, font_path, output_path,
         cursor_x += adv_px
 
     if not letter_pts:
-        print("No letter glyphs found.")
-        return
+        return None, 0, 0, 0
 
     ink_x1  = min(p[0] for p in letter_pts)
     ink_y1  = min(p[1] for p in letter_pts)
@@ -189,21 +182,16 @@ def render_skeleton(text, font_path, output_path,
     ink_y2  = max(p[3] for p in letter_pts)
     body_y2 = min(baseline_y + font_size * 0.3, ink_y2)
 
-    padding  = 55
+    padding  = 20
     canvas_w = int(ink_x2 - ink_x1) + padding * 2
     canvas_h = int(body_y2 - ink_y1) + padding * 2
-    min_h    = int(canvas_w * 0.65)
-    if canvas_h < min_h:
-        extra      = (min_h - canvas_h) // 2
-        canvas_h   = min_h
-        baseline_y += extra
 
     shift_x = -ink_x1 + padding
-    shift_y = (-ink_y1 + padding +
-               (canvas_h - int(body_y2 - ink_y1) - padding * 2) // 2)
+    shift_y = -ink_y1 + padding
 
     canvas = np.full((canvas_h, canvas_w), 255, dtype=np.uint8)
 
+    # Second pass — render glyphs
     cursor_x = 0.0
     for glyph_id, adv_px, off_x, off_y, is_diacritic in glyphs_data:
         ft_face.load_glyph(glyph_id, freetype.FT_LOAD_RENDER)
@@ -235,9 +223,9 @@ def render_skeleton(text, font_path, output_path,
         glyph_crop = glyph_arr[y1-oy:y2-oy, x1-ox:x2-ox]
 
         if is_diacritic:
-            alpha_f  = glyph_crop.astype(np.float32) / 255.0
-            blended  = (255*(1-alpha_f) +
-                        HARAKAT_GRAY*alpha_f).astype(np.uint8)
+            alpha_f = glyph_crop.astype(np.float32) / 255.0
+            blended = (255*(1-alpha_f) +
+                       HARAKAT_GRAY*alpha_f).astype(np.uint8)
             canvas[y1:y2, x1:x2] = np.minimum(
                 canvas[y1:y2, x1:x2], blended
             )
@@ -248,14 +236,144 @@ def render_skeleton(text, font_path, output_path,
 
         cursor_x += adv_px
 
-    if dot_boost > 1.0:
-        canvas = _boost_dots(canvas, dot_boost)
+    return canvas, canvas_w, canvas_h, baseline_y + shift_y
 
+
+def compose_lines(line_canvases, line_spacing_ratio=1.4, padding=55):
+    """
+    Compose multiple line bitmaps into a single canvas.
+    Lines are centered horizontally, stacked vertically.
+    line_spacing_ratio: multiplier of line height for spacing.
+    """
+    if not line_canvases:
+        return None
+
+    # Filter out failed lines
+    line_canvases = [c for c in line_canvases if c is not None]
+    if not line_canvases:
+        return None
+
+    if len(line_canvases) == 1:
+        return line_canvases[0]
+
+    # Max width determines canvas width
+    max_w = max(c.shape[1] for c in line_canvases)
+
+    # Calculate total height with spacing
+    line_heights = [c.shape[0] for c in line_canvases]
+    spacing      = int(max(line_heights) * (line_spacing_ratio - 1.0))
+    total_h      = sum(line_heights) + spacing * (len(line_canvases) - 1)
+    total_h     += padding * 2
+    total_w      = max_w + padding * 2
+
+    # White canvas
+    composed = np.full((total_h, total_w), 255, dtype=np.uint8)
+
+    # Place each line centered horizontally
+    y_offset = padding
+    for canvas in line_canvases:
+        h, w = canvas.shape
+        x_offset = (total_w - w) // 2   # center
+
+        y1 = y_offset
+        y2 = y_offset + h
+        x1 = x_offset
+        x2 = x_offset + w
+
+        # Blend line into composed canvas
+        composed[y1:y2, x1:x2] = np.minimum(
+            composed[y1:y2, x1:x2], canvas
+        )
+
+        y_offset += h + spacing
+
+    return composed
+
+
+def render_skeleton(text, font_path, output_path,
+                    font_size=140, dot_boost=1.15, add_border=True):
+    """
+    Renders Arabic text as a clean skeleton PNG for AI stylization.
+    Supports multi-line text — separate lines with newline characters.
+
+    Single line:  render_skeleton("بسم الله", ...)
+    Multi-line:   render_skeleton("بسم الله\nالرحمن الرحيم", ...)
+    """
+    # Split into lines — filter empty lines
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    if not lines:
+        print("No text to render.")
+        return
+
+    is_multiline = len(lines) > 1
+    print(f"  Lines: {len(lines)} {'(multi-line)' if is_multiline else ''}")
+
+    # Set up FreeType and HarfBuzz once for all lines
+    blob    = hb.Blob.from_file_path(font_path)
+    hb_face = hb.Face(blob)
+    hb_font = hb.Font(hb_face)
+
+    ft_face = freetype.Face(font_path)
+    ft_face.set_char_size(font_size * 64)
+    scale = font_size / ft_face.units_per_EM
+    print(f"Scale  : {scale:.4f} px per design unit")
+
+    # Render each line independently
+    line_canvases = []
+    for i, line in enumerate(lines):
+        print(f"  Rendering line {i+1}: {line[:30]}")
+        canvas, w, h, _ = render_single_line(
+            line, ft_face, hb_font, font_size, scale
+        )
+        if canvas is not None:
+            line_canvases.append(canvas)
+        else:
+            print(f"  Warning: line {i+1} produced no glyphs")
+
+    if not line_canvases:
+        print("No glyphs rendered.")
+        return
+
+    # Compose lines into single canvas
+    if is_multiline:
+        canvas = compose_lines(
+            line_canvases,
+            line_spacing_ratio=1.5,
+            padding=55
+        )
+        # Apply dot boost to composed canvas
+        if dot_boost > 1.0 and canvas is not None:
+            canvas = _boost_dots(canvas, dot_boost)
+    else:
+        canvas = line_canvases[0]
+
+        # Single line: apply min height ratio
+        min_h = int(canvas.shape[1] * 0.65)
+        if canvas.shape[0] < min_h:
+            extra  = (min_h - canvas.shape[0]) // 2
+            padded = np.full(
+                (min_h, canvas.shape[1]), 255, dtype=np.uint8
+            )
+            padded[extra:extra + canvas.shape[0], :] = canvas
+            canvas = padded
+
+        if dot_boost > 1.0:
+            canvas = _boost_dots(canvas, dot_boost)
+
+    if canvas is None:
+        print("Composition failed.")
+        return
+
+    # Save borderless mask copy
     canvas_for_mask = canvas.copy()
 
+    # Add frame for styles that use it
     if add_border:
         canvas = add_frame(canvas)
 
+    print(f"Canvas : {canvas.shape[1]} x {canvas.shape[0]} px")
+
+    # Scale to 1024px wide
     target_w = 1024
     ratio    = target_w / canvas.shape[1]
     target_h = int(canvas.shape[0] * ratio)
@@ -263,12 +381,13 @@ def render_skeleton(text, font_path, output_path,
     img = Image.fromarray(canvas, mode='L').convert('RGB')
     img = img.resize((target_w, target_h), Image.LANCZOS)
     img.save(output_path)
-    print(f"Saved -> {output_path} ({img.width}x{img.height})")
+    print(f"Saved  -> {output_path}  ({img.width}x{img.height})")
 
     mask_path = output_path.replace('.png', '_mask.png')
     mask_img  = Image.fromarray(canvas_for_mask, mode='L').convert('RGB')
     mask_img  = mask_img.resize((target_w, target_h), Image.LANCZOS)
     mask_img.save(mask_path)
+    print(f"Mask   -> {mask_path}")
 
 
 def _boost_dots(canvas, boost_factor):

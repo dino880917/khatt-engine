@@ -19,7 +19,9 @@ from khatt.geometry.skeleton  import render_skeleton, render_svg
 from khatt.diffusion.stylizer import stylize_skeleton
 from khatt.validation.gate    import validate_output
 from khatt.pipeline           import STYLES, enforce_aspect_ratio
-from khatt.transliteration.names import lookup, search as name_search, transliterate_western
+from khatt.transliteration.names import (
+    lookup, search as name_search, transliterate_western
+)
 
 Path("outputs").mkdir(exist_ok=True)
 Path("outputs/history").mkdir(exist_ok=True)
@@ -29,6 +31,10 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
 
 def create_transparent_png(stylized_path, skeleton_mask_path, output_path):
+    """
+    Creates transparent PNG using skeleton as alpha mask.
+    Counter-forms filled, edges dilated, gaussian smoothed.
+    """
     stylized = Image.open(stylized_path).convert("RGBA")
     skeleton = Image.open(skeleton_mask_path).convert("L")
 
@@ -39,8 +45,12 @@ def create_transparent_png(stylized_path, skeleton_mask_path, output_path):
     ink_mask = skel_arr < 100
     filled   = ndimage.binary_fill_holes(ink_mask)
     struct   = ndimage.generate_binary_structure(2, 1)
-    dilated  = ndimage.binary_dilation(filled, structure=struct, iterations=3)
-    alpha_f  = gaussian_filter(dilated.astype(np.float32) * 255, sigma=1.5)
+    dilated  = ndimage.binary_dilation(
+        filled, structure=struct, iterations=3
+    )
+    alpha_f  = gaussian_filter(
+        dilated.astype(np.float32) * 255, sigma=1.5
+    )
     alpha    = np.clip(alpha_f, 0, 255).astype(np.uint8)
 
     style_arr          = np.array(stylized)
@@ -69,6 +79,9 @@ async def health():
 
 @app.get("/api/name/lookup")
 def name_lookup(q: str):
+    """
+    Look up a name — Arabic database first, then Western transliteration.
+    """
     if not q or len(q.strip()) < 2:
         raise HTTPException(400, "Name too short")
     name   = q.strip()
@@ -81,6 +94,7 @@ def name_lookup(q: str):
 
 @app.get("/api/name/search")
 def name_search_endpoint(q: str):
+    """Autocomplete search for Arabic names."""
     if not q or len(q.strip()) < 1:
         return {"results": []}
     return {"results": name_search(q.strip())}
@@ -90,7 +104,7 @@ def name_search_endpoint(q: str):
 def download_svg(text: str, style: str = "thuluth", font_size: int = 140):
     """
     Generate and download a clean SVG vector file.
-    Uses FreeType Bézier outlines — no rasterization, no quality loss.
+    Uses skeleton tracing — correct for all fonts and styles.
     """
     if not text:
         raise HTTPException(400, "Text cannot be empty")
@@ -133,21 +147,27 @@ def generate(req: GenerateRequest):
     transparent_path   = "outputs/transparent.png"
 
     try:
+        # Layer 1 + 2 — render skeleton (single or multi-line)
         render_skeleton(
             text, cfg["font"], skeleton_path,
             font_size=req.font_size,
             add_border=cfg.get("border", False)
         )
 
+        # Layer 3 — aspect ratio enforcement
         enforce_aspect_ratio(skeleton_path)
+
+        # Save borderless mask copy for transparent PNG
         shutil.copy(skeleton_path, skeleton_mask_path)
 
+        # Layer 5 — validation (skip OCR on production)
         skip_ocr = os.getenv("SKIP_OCR", "false").lower() == "true"
         if skip_ocr:
             passed, score = True, 1.0
         else:
             passed, score, _ = validate_output(skeleton_path, text)
 
+        # Layer 4 — AI stylization (raw output, no masking)
         success = stylize_skeleton(
             skeleton_path, stylized_path,
             cfg["prompt"],
@@ -157,6 +177,7 @@ def generate(req: GenerateRequest):
         if not success:
             raise HTTPException(500, "Stylization API call failed")
 
+        # Generate transparent PNG
         try:
             create_transparent_png(
                 stylized_path, skeleton_mask_path, transparent_path
@@ -166,6 +187,7 @@ def generate(req: GenerateRequest):
             print(f"Transparent PNG failed: {e}")
             transparent_ok = False
 
+        # Save to history
         ts       = int(time.time())
         hist_dir = Path("outputs/history")
         shutil.copy(stylized_path, hist_dir / f"{ts}_{style}.png")
@@ -185,8 +207,10 @@ def generate(req: GenerateRequest):
             "skeleton_url":      f"/outputs/skeleton.png?t={ts}",
             "transparent_url":   f"/outputs/transparent.png?t={ts}"
                                  if transparent_ok else None,
-            "svg_url":           f"/api/svg?text={text}&style={style}"
-                                 f"&font_size={req.font_size}",
+            "svg_url":           (
+                f"/api/svg?text={text}&style={style}"
+                f"&font_size={req.font_size}"
+            ),
             "validation_score":  round(score, 2),
             "validation_passed": passed,
             "history":           history,
