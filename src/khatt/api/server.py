@@ -14,6 +14,7 @@ from khatt.geometry.skeleton  import render_skeleton
 from khatt.diffusion.stylizer import stylize_skeleton
 from khatt.validation.gate    import validate_output
 from khatt.pipeline           import STYLES, enforce_aspect_ratio
+from khatt.transliteration.names import lookup, search as name_search
 
 Path("outputs").mkdir(exist_ok=True)
 Path("outputs/history").mkdir(exist_ok=True)
@@ -66,6 +67,27 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.get("/api/name/lookup")
+def name_lookup(q: str):
+    """
+    Look up a name in Latin characters and return the Arabic spelling.
+    Example: /api/name/lookup?q=Mohammed
+    """
+    if not q or len(q.strip()) < 2:
+        raise HTTPException(400, "Name too short")
+    return lookup(q.strip())
+
+
+@app.get("/api/name/search")
+def name_search_endpoint(q: str):
+    """
+    Autocomplete search for names.
+    Example: /api/name/search?q=Moh
+    """
+    if not q or len(q.strip()) < 1:
+        return {"results": []}
+    return {"results": name_search(q.strip())}
 
 
 @app.post("/api/generate")

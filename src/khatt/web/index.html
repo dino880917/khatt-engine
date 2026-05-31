@@ -70,6 +70,42 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
   <label>النص العربي</label>
   <textarea id="txt" placeholder="اكتب النص هنا...">بسم الله</textarea>
 
+  <div style="margin-top:12px;direction:ltr">
+    <div style="font-size:10px;color:#c9a84c;letter-spacing:2px;
+                text-transform:uppercase;margin-bottom:8px">
+      ✦ Name in Calligraphy — اكتب اسمك
+    </div>
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <input id="name-input" type="text"
+        placeholder="Type a name... (Mohammed, Fatima, Ali...)"
+        style="flex:1;background:#111008;border:1px solid #3a2a10;
+               border-radius:8px;color:#e8d9b5;font-size:14px;
+               padding:10px 14px;outline:none;transition:border-color .2s"
+        oninput="nameAutocomplete(this.value)"
+        onfocus="this.style.borderColor='#c9a84c'"
+        onblur="this.style.borderColor='#3a2a10'">
+      <button onclick="nameToArabic()"
+        style="background:#1e1608;border:1px solid #4a3a10;
+               border-radius:8px;color:#c9a84c;font-size:11px;
+               padding:10px 16px;cursor:pointer;letter-spacing:2px;
+               white-space:nowrap;transition:all .2s"
+        onmouseover="this.style.borderColor='#c9a84c'"
+        onmouseout="this.style.borderColor='#4a3a10'">
+        USE NAME →
+      </button>
+    </div>
+    <div id="name-suggestions"
+      style="display:none;background:#181208;border:1px solid #3a2a10;
+             border-radius:8px;margin-top:4px;overflow:hidden">
+    </div>
+    <div id="name-result"
+      style="display:none;margin-top:8px;padding:10px 14px;
+             background:#0e2a0e;border:1px solid #1a4a1a;
+             border-radius:8px;color:#5aaa5a;font-size:13px;
+             direction:ltr">
+    </div>
+  </div>
+
   <span class="style-section-label">أسلوب الخط</span>
 
   <div class="style-group-label">— Naskh family (Amiri font)</div>
@@ -286,6 +322,80 @@ function showErr(msg) {
 document.getElementById('txt').addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === 'Enter') generate();
 });
+
+let nameDebounce;
+
+function nameAutocomplete(val) {
+  clearTimeout(nameDebounce);
+  if (val.length < 2) {
+    document.getElementById('name-suggestions').style.display = 'none';
+    return;
+  }
+  nameDebounce = setTimeout(async () => {
+    try {
+      const res  = await fetch(`/api/name/search?q=${encodeURIComponent(val)}`);
+      const data = await res.json();
+      showSuggestions(data.results || []);
+    } catch(e) {}
+  }, 300);
+}
+
+function showSuggestions(results) {
+  const box = document.getElementById('name-suggestions');
+  if (!results.length) { box.style.display = 'none'; return; }
+
+  box.innerHTML = results.map(r => `
+    <div onclick="selectName('${r.romanized}', '${r.arabic}')"
+      style="padding:10px 14px;cursor:pointer;display:flex;
+             justify-content:space-between;align-items:center;
+             border-bottom:1px solid #2e2410;transition:background .15s"
+      onmouseover="this.style.background='#1e1608'"
+      onmouseout="this.style.background='transparent'">
+      <span style="color:#7a6a4a;font-size:13px">${r.romanized}</span>
+      <span style="color:#e8d9b5;font-size:20px;font-family:inherit">${r.arabic}</span>
+    </div>
+  `).join('');
+  box.style.display = 'block';
+}
+
+function selectName(roman, arabic) {
+  document.getElementById('name-input').value = roman;
+  document.getElementById('name-suggestions').style.display = 'none';
+  document.getElementById('txt').value = arabic;
+  const result = document.getElementById('name-result');
+  result.innerHTML = `✓ ${roman} → <span style="font-size:20px">${arabic}</span> — ready to generate`;
+  result.style.display = 'block';
+}
+
+async function nameToArabic() {
+  const input = document.getElementById('name-input').value.trim();
+  if (!input) return;
+
+  document.getElementById('name-suggestions').style.display = 'none';
+
+  try {
+    const res  = await fetch(`/api/name/lookup?q=${encodeURIComponent(input)}`);
+    const data = await res.json();
+    const result = document.getElementById('name-result');
+
+    if (data.found) {
+      document.getElementById('txt').value = data.arabic;
+      result.innerHTML = `✓ ${data.input} → <span style="font-size:20px">${data.arabic}</span> — ready to generate`;
+      result.style.display  = 'block';
+      result.style.background = '#0e2a0e';
+      result.style.border     = '1px solid #1a4a1a';
+      result.style.color      = '#5aaa5a';
+    } else {
+      result.innerHTML = `"${data.input}" not found in our name database. Type the Arabic directly in the text field above.`;
+      result.style.display  = 'block';
+      result.style.background = '#2a0e0e';
+      result.style.border     = '1px solid #5a1a1a';
+      result.style.color      = '#c05a5a';
+    }
+  } catch(e) {
+    console.error(e);
+  }
+}
 </script>
 </body>
 </html>

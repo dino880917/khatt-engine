@@ -18,12 +18,6 @@ META_FILE = Path("dataset/wiki_metadata.json")
 
 # Verified Wikimedia Commons category names
 STYLE_CATEGORIES = {
-    "kufic": [
-        "Kufic script",
-        "Kufic calligraphy",
-        "Kufic inscriptions",
-        "Early Kufic manuscripts",
-    ],
     "naskh": [
         "Naskh (script)",
         "Arabic manuscripts",
@@ -40,15 +34,26 @@ STYLE_CATEGORIES = {
         "Persian calligraphy",
         "Safavid manuscripts",
     ],
-    "diwani": [
-        "Diwani script",
+"diwani":   [
+        "Diwani calligraphy",
         "Ottoman calligraphy",
         "Tughra",
+        "Ottoman firmans",
+        "Islamic calligraphy",
     ],
-    "ruqah": [
-        "Ruq'ah script",
+    "ruqah":    [
         "Arabic calligraphy",
+        "Islamic calligraphy",
+        "Arabic handwriting",
+        "Ruq'ah script",
         "Modern Arabic calligraphy",
+    ],
+    "kufic":    [
+        "Kufic calligraphy",
+        "Kufic inscriptions",
+        "Kufic script",
+        "Early Islamic calligraphy",
+        "Islamic inscriptions",
     ],
 }
 
