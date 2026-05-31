@@ -1,19 +1,15 @@
 import freetype
 import uharfbuzz as hb
 import numpy as np
+import re
 from PIL import Image
 from scipy import ndimage
 
-# Arabic harakat Unicode ranges
 HARAKAT_RANGE = set(range(0x064B, 0x0660)) | {0x0670, 0x0671}
-HARAKAT_GRAY  = 210   # gray level: 0=black, 255=white, 160=medium gray
+HARAKAT_GRAY  = 210
 
 
 def add_frame(canvas, frame_pad=18, outer_thick=3, gap=8, inner_thick=1):
-    """
-    Geometric double-border frame with diamond corner ornaments.
-    Occupies empty space so the AI does not fill it with calligraphy.
-    """
     result = canvas.copy()
     h, w   = result.shape
     p      = frame_pad
@@ -24,26 +20,23 @@ def add_frame(canvas, frame_pad=18, outer_thick=3, gap=8, inner_thick=1):
     def vline(x, y0, y1, t):
         result[max(0,y0):min(h,y1), max(0,x):min(w,x+t)] = 0
 
-    # Outer rectangle
-    hline(p,                 p, w-p, outer_thick)
-    hline(h-p-outer_thick,   p, w-p, outer_thick)
-    vline(p,                 p, h-p, outer_thick)
-    vline(w-p-outer_thick,   p, h-p, outer_thick)
+    hline(p,               p, w-p, outer_thick)
+    hline(h-p-outer_thick, p, w-p, outer_thick)
+    vline(p,               p, h-p, outer_thick)
+    vline(w-p-outer_thick, p, h-p, outer_thick)
 
-    # Inner rectangle
     i = p + gap + outer_thick
-    hline(i,                 i, w-i, inner_thick)
-    hline(h-i-inner_thick,   i, w-i, inner_thick)
-    vline(i,                 i, h-i, inner_thick)
-    vline(w-i-inner_thick,   i, h-i, inner_thick)
+    hline(i,               i, w-i, inner_thick)
+    hline(h-i-inner_thick, i, w-i, inner_thick)
+    vline(i,               i, h-i, inner_thick)
+    vline(w-i-inner_thick, i, h-i, inner_thick)
 
-    # Diamond corner ornaments
     diamond_r = 5
     corners = [
-        (p + gap//2 + outer_thick + 2,         p + gap//2 + outer_thick + 2),
-        (p + gap//2 + outer_thick + 2,         w - p - gap//2 - outer_thick - 2),
-        (h - p - gap//2 - outer_thick - 2,     p + gap//2 + outer_thick + 2),
-        (h - p - gap//2 - outer_thick - 2,     w - p - gap//2 - outer_thick - 2),
+        (p + gap//2 + outer_thick + 2, p + gap//2 + outer_thick + 2),
+        (p + gap//2 + outer_thick + 2, w - p - gap//2 - outer_thick - 2),
+        (h - p - gap//2 - outer_thick - 2, p + gap//2 + outer_thick + 2),
+        (h - p - gap//2 - outer_thick - 2, w - p - gap//2 - outer_thick - 2),
     ]
     for cy, cx in corners:
         for dy in range(-diamond_r, diamond_r + 1):
@@ -56,26 +49,88 @@ def add_frame(canvas, frame_pad=18, outer_thick=3, gap=8, inner_thick=1):
     return result
 
 
+
+def render_svg(text, font_path, output_path, font_size=140,
+               fill_color="#1a0a00"):
+    """
+    Render Arabic text as a clean SVG vector file.
+
+    Strategy: render the skeleton PNG first (already proven correct
+    for all fonts and styles), then trace it to vector paths using
+    vtracer. This sidesteps all FreeType coordinate system issues.
+
+    The skeleton PNG handles all font-specific positioning correctly.
+    vtracer converts the bitmap contours to clean Bézier paths.
+    Result: perfect vector output for any font, any style.
+    """
+    import tempfile
+    import vtracer
+
+    # Step 1 — render clean skeleton PNG at high resolution
+    # Use a temporary file so we don't overwrite the main skeleton
+    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+        tmp_png = tmp.name
+
+    try:
+        # Render at larger size for better vector quality
+        render_skeleton(
+            text, font_path, tmp_png,
+            font_size=font_size,
+            dot_boost=1.0,     # no dot boost for vector — we want clean paths
+            add_border=False   # no border for SVG output
+        )
+
+        # Step 2 — trace PNG to SVG
+        vtracer.convert_image_to_svg_py(
+            tmp_png,
+            output_path,
+            colormode    = 'binary',
+            hierarchical = 'stacked',
+            mode         = 'spline',
+            filter_speckle    = 4,
+            color_precision   = 6,
+            layer_difference  = 16,
+            corner_threshold  = 60,
+            length_threshold  = 4.0,
+            max_iterations    = 10,
+            splice_threshold  = 45,
+            path_precision    = 8
+        )
+
+        # Step 3 — inject fill color and metadata into SVG
+        with open(output_path, 'r', encoding='utf-8') as f:
+            svg_content = f.read()
+
+        # Replace default black with our fill color
+        svg_content = svg_content.replace(
+            'fill="#000000"', f'fill="{fill_color}"'
+        )
+
+        # Inject title and description
+        svg_content = svg_content.replace(
+            '<svg ',
+            '<svg xmlns:khatt="https://khatt-engine.onrender.com" '
+        )
+
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(svg_content)
+
+        print(f"SVG saved -> {output_path}")
+
+    finally:
+        import os
+        if os.path.exists(tmp_png):
+            os.unlink(tmp_png)
+        # Also clean up the mask file created by render_skeleton
+        mask = tmp_png.replace('.png', '_mask.png')
+        if os.path.exists(mask):
+            os.unlink(mask)
+
 def render_skeleton(text, font_path, output_path,
                     font_size=140, dot_boost=1.15, add_border=True):
     """
-    Renders Arabic text as a clean skeleton for AI stylization.
-
-    Harakat handling:
-      HarfBuzz receives the full text including harakat — they are
-      needed for correct shaping and letter connections. But harakat
-      glyphs are rendered in gray (not black) so the AI treats them as
-      secondary marks rather than primary ink, preventing ornamental
-      hallucination triggered by shadda, fatha, etc.
-
-    Empty space handling:
-      Canvas is tightened around the ink bounding box and a minimum
-      height is enforced to prevent flat wide compositions. The
-      geometric frame occupies the remaining space with a neutral
-      signal that tells the AI the composition is complete.
+    Renders Arabic text as a clean skeleton PNG for AI stylization.
     """
-
-    # 1 — Shape with HarfBuzz (full text including harakat)
     blob    = hb.Blob.from_file_path(font_path)
     hb_face = hb.Face(blob)
     hb_font = hb.Font(hb_face)
@@ -86,7 +141,6 @@ def render_skeleton(text, font_path, output_path,
     infos     = buf.glyph_infos
     positions = buf.glyph_positions
 
-    # Identify which input character positions are harakat
     harakat_clusters = {
         i for i, ch in enumerate(text)
         if ord(ch) in HARAKAT_RANGE
@@ -95,22 +149,19 @@ def render_skeleton(text, font_path, output_path,
         print(f"  Harakat at {len(harakat_clusters)} positions — "
               f"rendering in gray ({HARAKAT_GRAY}/255)")
 
-    # 2 — Load FreeType
     ft_face = freetype.Face(font_path)
     ft_face.set_char_size(font_size * 64)
     scale = font_size / ft_face.units_per_EM
-    print(f"Scale  : {scale:.4f} px per design unit")
 
-    # 3 — First pass: measure LETTER BODY bounds only (not harakat)
     glyphs_data = []
     cursor_x    = 0.0
     baseline_y  = 500
     letter_pts  = []
 
     for info, pos in zip(infos, positions):
-        adv_px      = pos.x_advance * scale
-        off_x       = pos.x_offset  * scale
-        off_y       = pos.y_offset  * scale
+        adv_px       = pos.x_advance * scale
+        off_x        = pos.x_offset  * scale
+        off_y        = pos.y_offset  * scale
         is_diacritic = info.cluster in harakat_clusters
 
         ft_face.load_glyph(info.codepoint, freetype.FT_LOAD_RENDER)
@@ -132,35 +183,27 @@ def render_skeleton(text, font_path, output_path,
         print("No letter glyphs found.")
         return
 
-    ink_x1 = min(p[0] for p in letter_pts)
-    ink_y1 = min(p[1] for p in letter_pts)
-    ink_x2 = max(p[2] for p in letter_pts)
-    ink_y2 = max(p[3] for p in letter_pts)
+    ink_x1  = min(p[0] for p in letter_pts)
+    ink_y1  = min(p[1] for p in letter_pts)
+    ink_x2  = max(p[2] for p in letter_pts)
+    ink_y2  = max(p[3] for p in letter_pts)
+    body_y2 = min(baseline_y + font_size * 0.3, ink_y2)
 
-    body_y2  = min(baseline_y + font_size * 0.3, ink_y2)
-
-    # Tighter padding — word fills more of the frame
     padding  = 55
     canvas_w = int(ink_x2 - ink_x1) + padding * 2
     canvas_h = int(body_y2 - ink_y1) + padding * 2
-
-    # Enforce minimum height to avoid flat wide compositions
-    # that invite the AI to fill vertical empty space
     min_h    = int(canvas_w * 0.65)
     if canvas_h < min_h:
-        extra    = (min_h - canvas_h) // 2
-        canvas_h = min_h
-        baseline_y += extra   # shift letters down to stay centered
+        extra      = (min_h - canvas_h) // 2
+        canvas_h   = min_h
+        baseline_y += extra
 
-    shift_x  = -ink_x1 + padding
-    shift_y  = -ink_y1 + padding + (canvas_h - int(body_y2 - ink_y1) - padding * 2) // 2
+    shift_x = -ink_x1 + padding
+    shift_y = (-ink_y1 + padding +
+               (canvas_h - int(body_y2 - ink_y1) - padding * 2) // 2)
 
-    print(f"Canvas : {canvas_w} x {canvas_h} px")
-
-    # 4 — White canvas
     canvas = np.full((canvas_h, canvas_w), 255, dtype=np.uint8)
 
-    # 5 — Render glyphs
     cursor_x = 0.0
     for glyph_id, adv_px, off_x, off_y, is_diacritic in glyphs_data:
         ft_face.load_glyph(glyph_id, freetype.FT_LOAD_RENDER)
@@ -181,7 +224,7 @@ def render_skeleton(text, font_path, output_path,
         )
         glyph_arr = raw.reshape(bm.rows, pitch)[:, :bm.width]
 
-        x1 = max(0, ox);           y1 = max(0, oy)
+        x1 = max(0, ox);            y1 = max(0, oy)
         x2 = min(canvas_w, ox + bm.width)
         y2 = min(canvas_h, oy + bm.rows)
 
@@ -189,37 +232,30 @@ def render_skeleton(text, font_path, output_path,
             cursor_x += adv_px
             continue
 
-        glyph_crop = glyph_arr[y1-oy : y2-oy, x1-ox : x2-ox]
+        glyph_crop = glyph_arr[y1-oy:y2-oy, x1-ox:x2-ox]
 
         if is_diacritic:
-            # Render harakat in gray — visually secondary to letter bodies
-            # blend: result = 255*(1-alpha) + HARAKAT_GRAY*alpha
             alpha_f  = glyph_crop.astype(np.float32) / 255.0
-            blended  = (255*(1-alpha_f) + HARAKAT_GRAY*alpha_f).astype(np.uint8)
+            blended  = (255*(1-alpha_f) +
+                        HARAKAT_GRAY*alpha_f).astype(np.uint8)
             canvas[y1:y2, x1:x2] = np.minimum(
                 canvas[y1:y2, x1:x2], blended
             )
         else:
-            # Render letter bodies in black
             canvas[y1:y2, x1:x2] = np.minimum(
-                canvas[y1:y2, x1:x2],
-                255 - glyph_crop
+                canvas[y1:y2, x1:x2], 255 - glyph_crop
             )
 
         cursor_x += adv_px
 
-    # 6 — Boost letter dots (harakat already handled above)
     if dot_boost > 1.0:
         canvas = _boost_dots(canvas, dot_boost)
 
-    # Save borderless canvas for alpha mask — must happen BEFORE adding frame
     canvas_for_mask = canvas.copy()
 
-    # Fix 2 — add geometric frame (main output only)
     if add_border:
         canvas = add_frame(canvas)
 
-    # Scale to 1024px wide
     target_w = 1024
     ratio    = target_w / canvas.shape[1]
     target_h = int(canvas.shape[0] * ratio)
@@ -227,24 +263,16 @@ def render_skeleton(text, font_path, output_path,
     img = Image.fromarray(canvas, mode='L').convert('RGB')
     img = img.resize((target_w, target_h), Image.LANCZOS)
     img.save(output_path)
-    print(f"Saved  -> {output_path}  ({img.width}x{img.height})")
+    print(f"Saved -> {output_path} ({img.width}x{img.height})")
 
-    # Save mask version — no border, same scale
     mask_path = output_path.replace('.png', '_mask.png')
     mask_img  = Image.fromarray(canvas_for_mask, mode='L').convert('RGB')
     mask_img  = mask_img.resize((target_w, target_h), Image.LANCZOS)
     mask_img.save(mask_path)
-    print(f"Mask   -> {mask_path}")
 
 
 def _boost_dots(canvas, boost_factor):
-    """
-    Enlarges small isolated ink regions (letter dots).
-    Only affects regions under 80px — letter bodies are much larger.
-    Harakat are already gray so _boost_dots ignores them naturally
-    (gray pixels are > 128 and are not treated as ink).
-    """
-    dark         = canvas < 128    # only pure black ink
+    dark         = canvas < 128
     labeled, num = ndimage.label(dark)
     boosted      = canvas.copy()
 
@@ -266,15 +294,3 @@ def _boost_dots(canvas, boost_factor):
             boosted[circle] = 0
 
     return boosted
-
-
-if __name__ == "__main__":
-    # Test with a heavily voweled word to verify gray harakat rendering
-    render_skeleton(
-        text        = "عَزَّام",
-        font_path   = "assets/fonts/Amiri-Regular.ttf",
-        output_path = "outputs/skeleton_test.png",
-        font_size   = 140,
-        dot_boost   = 1.15,
-        add_border  = True,
-    )

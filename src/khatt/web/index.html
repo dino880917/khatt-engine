@@ -184,7 +184,7 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
     </div>
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
     <a class="dl-btn" id="dl" href="#" download="khatt_output.png"
        style="margin-top:0">
       Download PNG
@@ -195,6 +195,12 @@ footer{text-align:center;margin-top:48px;color:#2e2410;font-size:10px;letter-spa
       Download Transparent
     </a>
   </div>
+  <a class="dl-btn" id="dl-svg" href="#"
+     download="khatt_calligraphy.svg"
+     style="margin-top:10px;display:none;
+            border-color:#5a8a5a;color:#5aaa5a;text-align:center">
+    Download SVG Vector — Clean Skeleton · Print · Laser Cut · Figma
+  </a>
   <button class="regen-btn" onclick="regenerate()">
     ↻ &nbsp; Regenerate — different aesthetic, same text
   </button>
@@ -276,6 +282,11 @@ async function generate() {
       dlTransparent.style.display = 'block';
     } else {
       dlTransparent.style.display = 'none';
+    }
+    const dlSvg = document.getElementById('dl-svg');
+    if (data.svg_url) {
+      dlSvg.href          = data.svg_url;
+      dlSvg.style.display = 'block';
     }
 
     const badge = document.getElementById('badge');

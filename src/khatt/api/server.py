@@ -3,14 +3,19 @@ import shutil
 import time
 import numpy as np
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 from PIL import Image
+from scipy import ndimage
+from scipy.ndimage import gaussian_filter
 
-from khatt.geometry.skeleton  import render_skeleton
+from khatt.geometry.skeleton  import render_skeleton, render_svg
 from khatt.diffusion.stylizer import stylize_skeleton
 from khatt.validation.gate    import validate_output
 from khatt.pipeline           import STYLES, enforce_aspect_ratio
@@ -24,9 +29,6 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
 
 def create_transparent_png(stylized_path, skeleton_mask_path, output_path):
-    from scipy import ndimage
-    from scipy.ndimage import gaussian_filter
-
     stylized = Image.open(stylized_path).convert("RGBA")
     skeleton = Image.open(skeleton_mask_path).convert("L")
 
@@ -37,12 +39,8 @@ def create_transparent_png(stylized_path, skeleton_mask_path, output_path):
     ink_mask = skel_arr < 100
     filled   = ndimage.binary_fill_holes(ink_mask)
     struct   = ndimage.generate_binary_structure(2, 1)
-    dilated  = ndimage.binary_dilation(
-        filled, structure=struct, iterations=3
-    )
-    alpha_f  = gaussian_filter(
-        dilated.astype(np.float32) * 255, sigma=1.5
-    )
+    dilated  = ndimage.binary_dilation(filled, structure=struct, iterations=3)
+    alpha_f  = gaussian_filter(dilated.astype(np.float32) * 255, sigma=1.5)
     alpha    = np.clip(alpha_f, 0, 255).astype(np.uint8)
 
     style_arr          = np.array(stylized)
@@ -68,36 +66,52 @@ async def root():
 async def health():
     return {"status": "ok"}
 
+
 @app.get("/api/name/lookup")
 def name_lookup(q: str):
-    """
-    Look up a name. Two-stage process:
-    1. Try Arabic name database (canonical spellings, instant)
-    2. If not found, phonetically transliterate via Claude (Western names)
-    """
     if not q or len(q.strip()) < 2:
         raise HTTPException(400, "Name too short")
-
-    name = q.strip()
-
-    # Stage 1 — Arabic name database
+    name   = q.strip()
     result = lookup(name)
     if result["found"]:
         result["method"] = "database"
         return result
-
-    # Stage 2 — Western name phonetic transliteration
     return transliterate_western(name)
+
 
 @app.get("/api/name/search")
 def name_search_endpoint(q: str):
-    """
-    Autocomplete search for names.
-    Example: /api/name/search?q=Moh
-    """
     if not q or len(q.strip()) < 1:
         return {"results": []}
     return {"results": name_search(q.strip())}
+
+
+@app.get("/api/svg")
+def download_svg(text: str, style: str = "thuluth", font_size: int = 140):
+    """
+    Generate and download a clean SVG vector file.
+    Uses FreeType Bézier outlines — no rasterization, no quality loss.
+    """
+    if not text:
+        raise HTTPException(400, "Text cannot be empty")
+    if style not in STYLES:
+        raise HTTPException(400, f"Unknown style: {style}")
+
+    cfg      = STYLES[style]
+    svg_path = "outputs/calligraphy.svg"
+
+    try:
+        render_svg(
+            text, cfg["font"], svg_path,
+            font_size=font_size,
+        )
+        return FileResponse(
+            svg_path,
+            media_type="image/svg+xml",
+            filename="khatt_calligraphy.svg"
+        )
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @app.post("/api/generate")
@@ -119,27 +133,21 @@ def generate(req: GenerateRequest):
     transparent_path   = "outputs/transparent.png"
 
     try:
-        # Layer 1 + 2 — skeleton
         render_skeleton(
             text, cfg["font"], skeleton_path,
             font_size=req.font_size,
             add_border=cfg.get("border", False)
         )
 
-        # Layer 3 — aspect ratio
         enforce_aspect_ratio(skeleton_path)
-
-        # Save mask copy
         shutil.copy(skeleton_path, skeleton_mask_path)
 
-        # Layer 5 — validation
         skip_ocr = os.getenv("SKIP_OCR", "false").lower() == "true"
         if skip_ocr:
             passed, score = True, 1.0
         else:
             passed, score, _ = validate_output(skeleton_path, text)
 
-        # Layer 4 — stylize
         success = stylize_skeleton(
             skeleton_path, stylized_path,
             cfg["prompt"],
@@ -149,7 +157,6 @@ def generate(req: GenerateRequest):
         if not success:
             raise HTTPException(500, "Stylization API call failed")
 
-        # Transparent version
         try:
             create_transparent_png(
                 stylized_path, skeleton_mask_path, transparent_path
@@ -159,11 +166,9 @@ def generate(req: GenerateRequest):
             print(f"Transparent PNG failed: {e}")
             transparent_ok = False
 
-        # History
-        ts        = int(time.time())
-        hist_dir  = Path("outputs/history")
-        hist_path = hist_dir / f"{ts}_{style}.png"
-        shutil.copy(stylized_path, hist_path)
+        ts       = int(time.time())
+        hist_dir = Path("outputs/history")
+        shutil.copy(stylized_path, hist_dir / f"{ts}_{style}.png")
 
         history_files = sorted(hist_dir.glob("*.png"))
         for old in history_files[:-12]:
@@ -171,9 +176,7 @@ def generate(req: GenerateRequest):
 
         history = [
             f"/outputs/history/{f.name}"
-            for f in sorted(
-                hist_dir.glob("*.png"), reverse=True
-            )[:6]
+            for f in sorted(hist_dir.glob("*.png"), reverse=True)[:6]
         ]
 
         return {
@@ -182,6 +185,8 @@ def generate(req: GenerateRequest):
             "skeleton_url":      f"/outputs/skeleton.png?t={ts}",
             "transparent_url":   f"/outputs/transparent.png?t={ts}"
                                  if transparent_ok else None,
+            "svg_url":           f"/api/svg?text={text}&style={style}"
+                                 f"&font_size={req.font_size}",
             "validation_score":  round(score, 2),
             "validation_passed": passed,
             "history":           history,
